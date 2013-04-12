@@ -11,8 +11,8 @@ nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3, DEPENDENT=4)
 def filehash(filePath):
     import hashlib
     BLOCK_SIZE = 8192
+    h = hashlib.md5()
     with open(filePath, 'rb') as fh:
-        h = hashlib.sha256()
         while True:
             data = fh.read(BLOCK_SIZE)
             if not data:
@@ -25,21 +25,16 @@ def exit(status, message):
     sys.exit(nagios_codes[status])
 
 def main():
-    if len(sys.argv) < 3:
-        exit('UNKNOWN', "I need at least a file+hash pair to continue...")
+    if len(sys.argv) < 2:
+        exit('UNKNOWN', "I need at least one file:hash pair to continue...")
     
-    f = sys.argv[1:]
-    l = len(f)
-
-    if l % 2 != 0:
-        exit('UNKNOWN', "You need to provide a full path+sha256 pair for each file")
+    args = sys.argv[1:]
     
-    results = []
+    results = ['Using MD5']
     status = 'OK'
-    for i in range(0, l, 2):
-        path = f[i]
-        expectedhash = f[i + 1]
+    for keypair in args:
         try:
+            path, expectedhash = keypair.split(':')
             hash = filehash(path)
             if hash == expectedhash:
                 results.append("%s is OK" % path)
