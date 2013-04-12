@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
-# This is a Nagios script to check files againbst an SHA256 hash
-# The files are passed on as parameters on a comma separated list.
+# This is a Nagios script to check files againbst a hash
+# Files & hashes are passed on as key-pair parameters. File and hash are separated by a ':'
+# Example: check_filehash.py /etc/passwd:0123456789abcdef /etc/group:fedcba9876543210
+
+# The script returns: UNKNOWN for parameter errors, WARNING for non-critical file
+# read errors, and WARNING if the check fails.
 
 import sys
 
-#Nagios exit codes
 nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3, DEPENDENT=4)
 
 def filehash(filePath):
