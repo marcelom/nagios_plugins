@@ -11,7 +11,7 @@
 
 import getopt
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 # Nagios return codes
@@ -19,7 +19,8 @@ nagios_codes = dict(OK=0, WARNING=1, CRITICAL=2, UNKNOWN=3, DEPENDENT=4)
 
 # Location of the state file
 # this is a text file with a timestamp, nothing else...
-STATE_FILE = '/var/lib/nagios/check_authlog_state'
+# STATE_FILE = '/var/lib/nagios/check_authlog_state'
+DEFAULT_LOOKBACK = 15
 LOG_FILENAME = '/var/log/auth.log'
 
 # IP whitelist: these IPs generate warnings only...
@@ -27,9 +28,9 @@ IP_WHITELIST = ['10.200.54.100', '10.200.54.1', '127.0.0.1']
 
 # usage string
 usage = """Usage:
-  -s, --state: Uses state file. Updates upon script end for future use.
-               If not present, then processes the entire log file without any timestamp evaluation.
-  -h, --help:  Prints this message. Ignore all other options.
+  -l, --lookback: Takesa numeric parameters and looks back 'n' minutes. If not specified, looks back 15 minutes.
+                  Use 0 to look up the whole file.
+  -h, --help:     Prints this message. Ignore all other options.
 """
 
 # def nslookup(ip):
@@ -40,27 +41,20 @@ usage = """Usage:
 #        return None
 #        return 'Not able to resolve name'
 
-def read_state(filename):
-    # return ValueError if file is not properly formatted
-    # read 100 bytes only, enough to get a timestamp and safe to avoid a DOS attach by
-    # providing a huge state file...
-    with open(filename, 'r') as f:
-        a = f.readline(100)
-    return datetime.strptime(a, '%Y %b %d %H:%M:%S')
-
 def exit(status, message):
     print status + ': ' + '; '.join(message)
     sys.exit(nagios_codes[status])
 
-def process_log(logfilename, cutoffdate):
+def process_log(logfilename, cutoff=DEFAULT_LOOKBACK):
     # return 2 sets of IPS and UIDS with suspicious activity
-    # logfilename is the log file to open, and cutoffdate is the date
-    # that it should start looking into
+    # logfilename is the log file to open, and cutoff is the number of minutes the script should look into
     IPS = set()
     WIPS = set()
     UIDS = set()
     
-    thisyear = datetime.now().year
+    now = datetime.now()
+    cutoffdatetime = now - timedelta(minutes=cutoff)
+    thisyear = now.year
 
     # matcher1 macthes root logins. Returns a (timestamp, IP) tuple
     # matcher2 matches escalations to root from normal users. Returns a (timestamp, User ID) tuple. 
@@ -74,47 +68,48 @@ def process_log(logfilename, cutoffdate):
             if match:
                 # quick hack, since the auth.log line does not contain the year, so we add it ourselves...
                 t = datetime.strptime("%s %s" % (thisyear, match.groups()[0]), '%Y %b %d %H:%M:%S')
-                ip = match.groups()[1]
-                if ip in IP_WHITELIST:
-                    WIPS.add(ip)
-                else:
-                    IPS.add(ip)
+                if t > cutoffdatetime or cutoff == 0:
+                    ip = match.groups()[1]
+                    if ip in IP_WHITELIST:
+                        WIPS.add(ip)
+                    else:
+                        IPS.add(ip)
             match = matcher2.search(line)
             if match:
                 t = datetime.strptime("%s %s" % (thisyear, match.groups()[0]), '%Y %b %d %H:%M:%S')
-                UIDS.add(match.groups()[1])
+                if t > cutoffdatetime or cutoff == 0:
+                    UIDS.add(match.groups()[1])
     
-    return IPS, WIPS, UIDS
+    return IPS, WIPS, UIDS, now, cutoffdatetime
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "sh", ["state", "help"])
+        opts, args = getopt.getopt(sys.argv[1:], "l:h", ["lookback", "help"])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
         print usage
         sys.exit(10)
-    use_state = False
+    lookback = DEFAULT_LOOKBACK
     for o, a in opts:
         if o in ("-h", "--help"):
             print usage
             sys.exit()
-        elif o in ("-s", "--state"):
-            use_state = True
+        elif o in ("-l", "--lookback"):
+            try:
+                lookback = int(a)
+            except:
+                lookback = DEFAULT_LOOKBACK
         else:
             assert False, "unhandled option"
 
-    status = 'OK'
-    results = ['Processing for events after %s:' % '123']
-    
     try:
-        cutoffdate = read_state(STATE_FILE)
-    except Exception as e:
-        cutoffdate = None
-        results.append('Error retrieving state (%s) - Processing from the beginning of file' % str(e))
-
-    try:
-        IPS, WIPS, UIDS = process_log(LOG_FILENAME, cutoffdate)
+        IPS, WIPS, UIDS, now, then = process_log(LOG_FILENAME, lookback)
+        status = 'OK'
+        if now == then:
+            results = ['Processing events for entire log']
+        else:
+            results = ['Processing events from %s to %s' % (then.isoformat(), now.isoformat())]
         if len(WIPS) != 0:
             status = 'WARNING'
             results.append('Whitelisted Root login from the following IPs: %s' % ','.join(WIPS))
@@ -124,8 +119,10 @@ def main():
         if len(UIDS) != 0:
             status = 'CRITICAL'
             results.append('Root escalation from the following UIDs: %s' % ','.join(UIDS))
+        if len(results) == 1:
+            results.append('No events to report !')
     except Exception as e:
-        results.append('Error processing the log file (%s)' % str(e))
+        results = ['Error processing the log file (%s)' % str(e)]
         status = 'UNKNOWN'
         exit(status, results)
     
