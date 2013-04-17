@@ -106,6 +106,7 @@ def main():
 
     try:
         IPS, WIPS, UIDS, now, then = process_log(LOG_FILENAME, lookback)
+        UIDS.discard('0')  # dont want the '0' notifications...
         status = 'OK'
         if now == then:
             results = ['Processing events for entire log']
@@ -118,10 +119,8 @@ def main():
             status = 'CRITICAL'
             results.append('Root login from the following IPs: %s' % ','.join(IPS))
         if len(UIDS) != 0:
-            status = 'WARNING'
+            status = 'CRITICAL'
             results.append('Root escalation from the following UIDs: %s' % ','.join(UIDS))
-            if sum(UIDS) > 0:
-                status = 'CRITICAL'
         if len(results) == 1:
             results.append('No events to report !')
     except Exception as e:
