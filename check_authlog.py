@@ -59,7 +59,8 @@ def process_log(logfilename, cutoff=DEFAULT_LOOKBACK):
     # matcher1 macthes root logins. Returns a (timestamp, IP) tuple
     # matcher2 matches escalations to root from normal users. Returns a (timestamp, User ID) tuple. 
     matcher1 = re.compile('^(\w{3}\s+\d{1,2}\s\d{2}\:\d{2}\:\d{2}).+Accepted password for root from ((?:\d{1,3}\.){3}\d{1,3}).+$')
-    matcher2 = re.compile('^(\w{3}\s+\d{1,2}\s\d{2}\:\d{2}\:\d{2}).+sudo.+session opened for user root by \(uid\=(\d+)\)$')
+    # matcher2 = re.compile('^(\w{3}\s+\d{1,2}\s\d{2}\:\d{2}\:\d{2}).+sudo.+session opened for user root by \(uid\=(\d+)\)$')
+    matcher2 = re.compile('^(\w{3}\s+\d{1,2}\s\d{2}\:\d{2}\:\d{2}).+session opened for user root by \(uid\=(\d+)\)$')
     
     # with open('./t.log', 'r') as f:
     with open('/var/log/auth.log', 'r') as f:
@@ -117,8 +118,10 @@ def main():
             status = 'CRITICAL'
             results.append('Root login from the following IPs: %s' % ','.join(IPS))
         if len(UIDS) != 0:
-            status = 'CRITICAL'
+            status = 'WARNING'
             results.append('Root escalation from the following UIDs: %s' % ','.join(UIDS))
+            if sum(UIDS) > 0:
+                status = 'CRITICAL'
         if len(results) == 1:
             results.append('No events to report !')
     except Exception as e:
