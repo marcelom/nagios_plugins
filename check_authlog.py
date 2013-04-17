@@ -24,7 +24,7 @@ DEFAULT_LOOKBACK = 15
 LOG_FILENAME = '/var/log/auth.log'
 
 # IP whitelist: these IPs generate warnings only...
-IP_WHITELIST = ['10.200.54.100', '10.200.54.1', '127.0.0.1']
+IP_WHITELIST = ['10.200.54.100']
 
 # usage string
 usage = """Usage:
