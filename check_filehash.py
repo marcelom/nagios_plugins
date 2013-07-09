@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+#############################################################################################
+### THIS FILE IS HERE FOR HISTORICAL PURPOSES, PLEASE USE THE BASH SCRIPT VERSION INSTEAD ###
+############################################################################################# 
+
 # This is a Nagios script to check files againbst a hash
 # Files & hashes are passed on as key-pair parameters. File and hash are separated by a ':'
 # Example: check_filehash.py /etc/passwd:0123456789abcdef /etc/group:fedcba9876543210
