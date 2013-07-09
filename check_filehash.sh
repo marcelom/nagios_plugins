@@ -22,8 +22,6 @@ MD5OUTPUT=`md5sum -c $MD5CFG 2>&1`
 #MD5OUTPUT=`md5sum -c $MD5CFG --quiet`
 MD5EXITCODE=$?
 
-echo $MD5EXITCODE
-
 if [[ $MD5EXITCODE -eq 0 ]]
 then
   echo "OK: All checksums fine"
